@@ -1,0 +1,50 @@
+{
+  "name": "kode-agent",
+  "version": "1.5.2-beta.1",
+  "description": "Event-driven Agent Model Client SDK for building long-running, collaborative AI agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build",
+    "test:cli": "ts-node test-cli.ts",
+    "example:u1": "ts-node examples/u1-nextjs-backend.ts",
+    "example:u2": "ts-node examples/u2-permission-approval.ts",
+    "example:u3": "ts-node examples/u3-hook-guard.ts",
+    "example:u4": "ts-node examples/u4-scheduler.ts",
+    "example:u5": "ts-node examples/u5-sub-agent.ts",
+    "example:u6": "ts-node examples/u6-room-chat.ts",
+    "example:u7": "ts-node examples/u7-chatdev-team.ts"
+  },
+  "keywords": [
+    "agent",
+    "ai",
+    "llm",
+    "anthropic",
+    "claude",
+    "event-driven",
+    "multi-agent",
+    "collaboration",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "kode-agent": "^1.5.2-beta.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}

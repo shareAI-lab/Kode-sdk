@@ -1,0 +1,20 @@
+node_modules/
+dist/
+*.log
+.env
+data/
+test-data/
+workspace*/
+test-workspace/
+.temp/
+*.swp
+*.swo
+*~
+.DS_Store
+test-cli.ts
+
+# Ignore all markdown files except README.md and files in doc/docs folders
+*.md
+!README.md
+!doc/**/*.md
+!docs/**/*.md
