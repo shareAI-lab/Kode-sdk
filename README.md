@@ -1,312 +1,74 @@
-# Kode SDK v1.5.1
+# KODE SDK · Event-Driven Agent Runtime
 
-Event-driven Agent Model Client SDK for building long-running, collaborative AI agents.
+> **就像和资深同事协作**：发消息、批示、打断、分叉、续上 —— 一套最小而够用的 API，驱动长期在线的多 Agent 系统。
 
-## Vision
+## Why KODE
 
-Transform the experience of collaborating with colleagues into a minimal yet sufficient API for **sending messages, giving instructions, interrupting, forking, and resuming** with long-running online Agents.
+- **Event-First**：UI 只订阅 Progress（文本/工具流）；审批与治理走 Control & Monitor 回调，默认不推噪音事件。
+- **长时运行 + 可分叉**：七段断点恢复（READY → POST_TOOL），Safe-Fork-Point 天然存在于工具结果与纯文本处，一键 fork 继续。
+- **同事式协作心智**：Todo 管理、提醒、Tool 手册自动注入，工具并发可限流，默认配置即安全可用。
+- **高性能且可审计**：统一 WAL、零拷贝文本流、工具拒绝必落审计、Monitor 事件覆盖 token 用量、错误与文件变更。
+- **可扩展生态**：原生接入 MCP 工具、Sandbox 驱动、模型 Provider、Store 后端、Scheduler DSL，支持企业级自定义。
 
-## Features
-
-- **Event-Driven First**: Subscribe to data plane events (text/tools/usage), control plane callbacks (approvals/hooks)
-- **Multi-Agent Ready**: Long-running independent agents with colleague-style collaboration
-- **Strong Recovery**: 7-type breakpoint recovery; seals without inserting system text; defaults to READY state
-- **Forkable**: Safe-Fork-Points (SFP) naturally exist at tool results and text-only assistant messages
-- **Tool Safety**: Denial doesn't throw exceptions; rejected tool results are logged and auditable
-- **High Performance**: Concurrent tool execution (rate-limited), streaming model completion, incremental events (cursor/since)
-- **Extensible**: MCP tools, Sandbox drivers, Provider adapters, Store backends, Scheduler DSL
-
-## Quick Start
+## 60 秒上手：跑通第一个“协作收件箱”
 
 ```bash
-npm install kode-sdk
+npm install @kode/sdk
+export ANTHROPIC_API_KEY=sk-...        # 或 ANTHROPIC_API_TOKEN
+export ANTHROPIC_BASE_URL=https://...   # 可选，默认为官方 API
+export ANTHROPIC_MODEL_ID=claude-sonnet-4.5-20250929  # 可选
+
+npm run example:agent-inbox
 ```
 
-```typescript
-import { Agent, JSONStore, LocalSandbox, AnthropicProvider, builtin } from 'kode-sdk';
+输出中你会看到：
 
-const agent = new Agent({
-  sessionId: 'agent:assistant/session:demo',
-  provider: new AnthropicProvider(process.env.ANTHROPIC_API_KEY),
-  store: new JSONStore('./data'),
-  sandbox: LocalSandbox.local({ workDir: './workspace' }),
-  tools: [...builtin.fs({ workDir: './workspace' }), ...builtin.bash()],
-  system: 'You are a helpful assistant.',
-});
+- Progress 渠道实时流式文本 / 工具生命周期事件
+- Control 渠道的审批请求（示例中默认拒绝 `bash_run`）
+- Monitor 渠道的工具审计日志（耗时、审批结果、错误）
 
-// Send message
-await agent.send('Please list all files in the workspace');
+想自定义行为？修改 `examples/01-agent-inbox.ts` 内的模板、工具与事件订阅即可。
 
-// Subscribe to events
-for await (const event of agent.subscribe()) {
-  if (event.type === 'text') {
-    console.log('Agent:', event.text);
-  }
-  if (event.type === 'state' && event.state === 'READY') {
-    break;
-  }
-}
-```
+## 示例游乐场
 
-## Core Concepts
+| 示例 | 用例 | 涵盖能力 |
+| --- | --- | --- |
+| `npm run example:getting-started` | 最小对话循环 | Progress 流订阅、Anthropic 模型直连 |
+| `npm run example:agent-inbox` | 事件驱动收件箱 | Todo 管理、工具并发、Monitor 审计 |
+| `npm run example:approval` | 工具审批工作流 | Control 回调、Hook 策略、自动拒绝/放行 |
+| `npm run example:room` | 多 Agent 协作 | AgentPool、Room 消息、Safe Fork、Lineage |
+| `npm run example:scheduler` | 长时运行 & 提醒 | Scheduler 步数触发、系统提醒、FilePool 监控 |
+| `npm run example:nextjs` | API + SSE | Resume-or-create、Progress 流推送（无需安装 Next） |
 
-### 1. Agent States
+每个示例都位于 `examples/` 下，对应 README 中的学习路径，展示事件驱动、审批、安全、调度、协作等核心能力的组合方式。
 
-- **READY**: Waiting for user input
-- **BUSY**: Processing request or executing tools
-- **PAUSED**: Waiting for permission approval
+## 构建属于你的协作型 Agent
 
-### 2. Safe-Fork-Points (SFP)
+1. **理解三通道心智**：详见 [`docs/events.md`](./docs/events.md)。
+2. **跟着 Quickstart 实战**：[`docs/quickstart.md`](./docs/quickstart.md) 从 “依赖注入 → Resume → SSE” 手把手搭建服务。
+3. **扩展用例**：[`docs/playbooks.md`](./docs/playbooks.md) 涵盖审批治理、多 Agent 小组、调度提醒等典型场景。
+4. **查阅 API**：[`docs/api.md`](./docs/api.md) 枚举 `Agent`、`EventBus`、`ToolRegistry` 等核心类型与事件。
+5. **深挖能力**：Todo、ContextManager、Scheduler、Sandbox、Hook、Tool 定义详见 `docs/` 目录。
 
-SFPs are created when:
-- Tool results are written (`tool_result` blocks)
-- Assistant provides text-only response (no tools)
-
-Use SFPs to:
-- Fork sessions at safe states
-- Create bookmarks for rollback
-- Branch conversations
-
-### 3. Event System
-
-**MINIMAL Event Kinds** (default subscription):
-- `text_chunk`: Streaming text delta
-- `text`: Complete text content
-- `tool_use`: Tool invocation
-- `tool_result`: Tool execution result
-- `usage`: Token/cost metrics
-- `error`: Typed errors
-- `messages_update`: Message history changed
-
-**Additional Events** (opt-in):
-- `state`: Agent state changes
-- `commit`: SFP created
-- `permission_ask`: Approval required
-- `permission_decision`: Approval result
-- `resume`: Recovery from crash
-- `forked`: New session created
-
-### 4. Hooks
-
-Intercept and modify tool execution:
-
-```typescript
-agent.use({
-  preToolUse(call, ctx) {
-    // Validate, modify args, or deny
-    if (!ctx.sandbox.fs.isInside(call.args.file)) {
-      return { decision: 'deny', reason: 'path out of sandbox' };
-    }
-    // Request approval
-    return { decision: 'ask', meta: { title: 'File Access', path: call.args.file } };
-  },
-
-  postToolUse(outcome, ctx) {
-    // Trim large results
-    if (String(outcome.content).length > 100_000) {
-      const path = ctx.sandbox.fs.temp(`tool-${outcome.id}.log`);
-      ctx.sandbox.fs.write(path, outcome.content);
-      return { update: { content: `[Full output at ./${path}]` } };
-    }
-  },
-});
-```
-
-### 5. Scheduler
-
-Time-based and step-based triggers:
-
-```typescript
-agent.schedule()
-  .every('10m', () => agent.send('Status check'))
-  .everySteps(20, () => agent.send('Reminder: review security guidelines'))
-  .daily('09:00', () => agent.send('Daily report'))
-  .weekly('Mon 09:00', () => agent.send('Weekly summary'));
-```
-
-### 6. AgentPool
-
-Manage multiple agent instances:
-
-```typescript
-const pool = new AgentPool({
-  store: new JSONStore('./data'),
-  maxAgents: 50,
-});
-
-const agent = pool.create(sessionId, template, options);
-const existing = pool.get(sessionId);
-const agents = pool.list({ prefix: 'org:acme/' });
-```
-
-### 7. Room (Group Chat)
-
-Multi-agent collaboration:
-
-```typescript
-const room = new Room(pool);
-room.join('alice', 'agent:pm/session:alice');
-room.join('bob', 'agent:dev/session:bob');
-
-// Direct mention
-await room.say('alice', '@bob Please review the PR');
-
-// Broadcast (excludes sender)
-await room.say('alice', 'Meeting at 3pm');
-```
-
-## Built-in Tools
-
-### File System
-
-```typescript
-builtin.fs({ base: './workspace' })
-```
-
-- `Fs.Read`: Read file contents
-- `Fs.Write`: Write/create files
-- `Fs.Edit`: Replace text in files
-
-### Bash Commands
-
-```typescript
-builtin.bash({
-  allow: [/^git /, /^npm /],
-  block: [/rm -rf/, /sudo/],
-  approval: true,
-})
-```
-
-- `Bash.Run`: Execute commands (foreground/background)
-- `Bash.Logs`: Get output from background shell
-- `Bash.Kill`: Terminate background shell
-
-### Task Delegation
-
-```typescript
-builtin.task({ subAgents: [FrontendAssistant, BackendAssistant] })
-```
-
-- `Task.Run`: Delegate work to specialized sub-agents
-
-## API Reference
-
-### Agent
-
-```typescript
-// Send message (non-blocking)
-send(text: string): Promise<string>
-
-// Subscribe to events
-subscribe(opts?: { since?: number; kinds?: AgentEventKind[] }): AsyncIterable<AgentEvent>
-
-// Convenience: send + subscribe
-chat(text: string): AsyncIterable<AgentEvent>
-
-// Blocking: wait for complete response
-reply(text: string): Promise<string>
-
-// One-off LLM query
-askLLM(text: string, opts?): Promise<{ text: string; sessionId: string }>
-
-// Control
-interrupt(reason?: string): Promise<void>
-decide(permId: string, decision: 'allow' | 'deny', note?: string): Promise<void>
-
-// Snapshot & Fork
-snapshot(label?: string): Promise<SnapshotId>
-fork(sel?: SnapshotId | { at?: string }): Agent
-
-// Introspection
-status(): Promise<AgentStatus>
-info(): Promise<AgentInfo>
-history(opts?: { since?: number; limit?: number }): Promise<AgentEvent[]>
-
-// Extension
-use(hooks: Hooks): this
-getHooks(): ReadonlyArray<RegisteredHook>
-registerTools(tools: Tool[]): this
-schedule(): AgentSchedulerHandle
-on(event: 'permission_ask' | 'error' | 'messages_update', handler: Function): this
-```
-
-## Session ID Format
+## 基础设计一图流
 
 ```
-[org:{orgId}/][team:{teamId}/][user:{userId}/]agent:{template}/session:{rootId}[/fork:{forkId}]*
+Client/UI ── subscribe(['progress']) ──┐
+Approval service ── Control 回调 ─────┼▶ EventBus（三通道）
+Observability ── Monitor 事件 ────────┘
+
+             │
+             ▼
+   MessageQueue → ContextManager → ToolRunner
+             │             │             │
+             ▼             ▼             ▼
+        Store (WAL)    FilePool      PermissionManager
 ```
 
-Examples:
-- `agent:assistant/session:abc123`
-- `org:acme/team:eng/user:42/agent:pm/session:xyz789`
-- `agent:dev/session:main/fork:branch1/fork:branch2`
+## 下一步
 
-Snapshots:
-- `{sessionId}@sfp:{index}`
-- `{sessionId}@label:{slug}`
+- 使用 `examples/` 作为蓝本接入你自己的工具、存储、审批系统。
+- 将 Monitor 事件接入现有 observability 平台，沉淀治理与审计能力。
+- 参考 `docs/` 中的扩展指南，为企业自定义 Sandbox、模型 Provider 或多团队 Agent 协作流程。
 
-## Examples
-
-See `examples/` directory:
-
-- **U1**: Next.js backend (send + subscribe via SSE)
-- **U2**: Permission approval flow
-- **U3**: Hook for path guard and result trimming
-- **U4**: Scheduler with time and step triggers
-- **U5**: Sub-agent task delegation
-- **U6**: Room group chat
-- **U7**: ChatDev team collaboration
-
-## Architecture
-
-```
-Core
- ├─ Agent          (推进引擎；事件管道；SFP 记录；Hook 执行)
- ├─ Events         (cursor/since；增量持久)
- ├─ Scheduler      (时间与 Steps 触发)
- ├─ Hooks          (pre/post tool；pre/post model)
- └─ API            (send/subscribe/chat/reply/askLLM/interrupt/decide/snapshot/fork/resume)
-
-Infra
- ├─ Providers      (Anthropic 直通；其余适配)
- ├─ Sandbox        (local/docker/k8s/remote/vfs)
- ├─ Store          (json/sqlite/postgres)
- ├─ Tools          (内置 FS/Bash/Task；MCP 适配)
- └─ Pool           (实例容器；限额；显式 resume)
-```
-
-## Design Philosophy
-
-### Event-Driven First
-
-Default push **MINIMAL events only**. Other events require explicit opt-in via `kinds` parameter.
-
-This forces event-driven patterns and prevents "chaotic operations" on subscription interfaces.
-
-### Tool Safety
-
-Denial doesn't throw exceptions. Instead:
-- Returns `tool_result` with `ok: false`
-- Content explains reason for denial
-- Fully auditable trail
-
-### Strong Recovery
-
-7 breakpoint types (A-G):
-- A: Before model request
-- B: After model gives tool_use, before approval
-- C: During approval wait
-- D: In preToolUse hook
-- E: During tool execution
-- F: In postToolUse hook
-- G: During streaming response
-
-All recover by sealing incomplete operations (no system text injection) and returning to READY state.
-
-## Contributing
-
-Contributions welcome! Please see PRD and TDD in `Kode_SDK_v1.5.1.md` for detailed specifications.
-
-## License
-
-MIT
+欢迎在 Issue / PR 中分享反馈与场景诉求，让 KODE SDK 更贴近真实协作团队的需求。

@@ -1,11 +1,11 @@
 import { ToolCall, ToolOutcome, HookDecision, PostHookResult, ToolContext } from '../core/types';
-import { ProviderResponse } from '../infra/provider';
+import { ModelResponse } from '../infra/provider';
 
 export interface Hooks {
   preToolUse?: (call: ToolCall, ctx: ToolContext) => HookDecision | Promise<HookDecision>;
   postToolUse?: (outcome: ToolOutcome, ctx: ToolContext) => PostHookResult | Promise<PostHookResult>;
   preModel?: (request: any) => void | Promise<void>;
-  postModel?: (response: ProviderResponse) => void | Promise<void>;
+  postModel?: (response: ModelResponse) => void | Promise<void>;
   messagesChanged?: (snapshot: any) => void | Promise<void>;
 }
 
@@ -49,7 +49,7 @@ export class HookManager {
     for (const { hooks } of this.hooks) {
       if (hooks.postToolUse) {
         const result = await hooks.postToolUse(current, ctx);
-        if (result) {
+        if (result && typeof result === 'object') {
           if ('replace' in result) {
             current = result.replace;
           } else if ('update' in result) {
@@ -70,7 +70,7 @@ export class HookManager {
     }
   }
 
-  async runPostModel(response: ProviderResponse) {
+  async runPostModel(response: ModelResponse) {
     for (const { hooks } of this.hooks) {
       if (hooks.postModel) {
         await hooks.postModel(response);

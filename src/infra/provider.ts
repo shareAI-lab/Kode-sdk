@@ -1,6 +1,7 @@
 import { Message, ContentBlock } from '../core/types';
+import { Configurable } from '../core/config';
 
-export interface ProviderResponse {
+export interface ModelResponse {
   role: 'assistant';
   content: ContentBlock[];
   usage?: {
@@ -10,7 +11,7 @@ export interface ProviderResponse {
   stop_reason?: string;
 }
 
-export interface ProviderStreamChunk {
+export interface ModelStreamChunk {
   type: 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'message_delta' | 'message_stop';
   index?: number;
   content_block?: ContentBlock;
@@ -24,7 +25,21 @@ export interface ProviderStreamChunk {
   };
 }
 
-export interface Provider {
+export interface ModelConfig {
+  provider: 'anthropic' | string;
+  model: string;
+  baseUrl?: string;
+  apiKey?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
+export interface ModelProvider extends Configurable<ModelConfig> {
+  readonly model: string;
+  readonly maxWindowSize: number;
+  readonly maxOutputTokens: number;
+  readonly temperature: number;
+
   complete(
     messages: Message[],
     opts?: {
@@ -34,7 +49,7 @@ export interface Provider {
       system?: string;
       stream?: boolean;
     }
-  ): Promise<ProviderResponse>;
+  ): Promise<ModelResponse>;
 
   stream(
     messages: Message[],
@@ -44,15 +59,23 @@ export interface Provider {
       temperature?: number;
       system?: string;
     }
-  ): AsyncIterable<ProviderStreamChunk>;
+  ): AsyncIterable<ModelStreamChunk>;
+
 }
 
-export class AnthropicProvider implements Provider {
+export class AnthropicProvider implements ModelProvider {
+  readonly maxWindowSize = 200_000;
+  readonly maxOutputTokens = 4096;
+  readonly temperature = 0.7;
+  readonly model: string;
+
   constructor(
     private apiKey: string,
-    private model: string = 'claude-3-5-sonnet-20241022',
+    model: string = 'claude-3-5-sonnet-20241022',
     private baseUrl: string = 'https://api.anthropic.com'
-  ) {}
+  ) {
+    this.model = model;
+  }
 
   async complete(
     messages: Message[],
@@ -63,7 +86,7 @@ export class AnthropicProvider implements Provider {
       system?: string;
       stream?: boolean;
     }
-  ): Promise<ProviderResponse> {
+  ): Promise<ModelResponse> {
     const body: any = {
       model: this.model,
       messages: this.formatMessages(messages),
@@ -106,7 +129,7 @@ export class AnthropicProvider implements Provider {
       temperature?: number;
       system?: string;
     }
-  ): AsyncIterable<ProviderStreamChunk> {
+  ): AsyncIterable<ModelStreamChunk> {
     const body: any = {
       model: this.model,
       messages: this.formatMessages(messages),
@@ -177,5 +200,16 @@ export class AnthropicProvider implements Provider {
       role: msg.role === 'system' ? 'user' : msg.role,
       content: msg.content,
     }));
+  }
+
+  toConfig(): ModelConfig {
+    return {
+      provider: 'anthropic',
+      model: this.model,
+      baseUrl: this.baseUrl,
+      apiKey: this.apiKey,
+      maxTokens: this.maxOutputTokens,
+      temperature: this.temperature,
+    };
   }
 }

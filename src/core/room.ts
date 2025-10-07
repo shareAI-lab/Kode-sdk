@@ -2,7 +2,7 @@ import { AgentPool } from '../core/pool';
 
 export interface RoomMember {
   name: string;
-  sessionId: string;
+  agentId: string;
 }
 
 export class Room {
@@ -10,11 +10,11 @@ export class Room {
 
   constructor(private pool: AgentPool) {}
 
-  join(name: string, sessionId: string): void {
+  join(name: string, agentId: string): void {
     if (this.members.has(name)) {
       throw new Error(`Member already exists: ${name}`);
     }
-    this.members.set(name, sessionId);
+    this.members.set(name, agentId);
   }
 
   leave(name: string): void {
@@ -27,21 +27,21 @@ export class Room {
     if (mentions.length > 0) {
       // Directed message
       for (const mention of mentions) {
-        const sessionId = this.members.get(mention);
-        if (sessionId) {
-          const agent = this.pool.get(sessionId);
+        const agentId = this.members.get(mention);
+        if (agentId) {
+          const agent = this.pool.get(agentId);
           if (agent) {
-            await agent.send(`[from:${from}] ${text}`);
+            await agent.complete(`[from:${from}] ${text}`);
           }
         }
       }
     } else {
       // Broadcast to all except sender
-      for (const [name, sessionId] of this.members) {
+      for (const [name, agentId] of this.members) {
         if (name !== from) {
-          const agent = this.pool.get(sessionId);
+          const agent = this.pool.get(agentId);
           if (agent) {
-            await agent.send(`[from:${from}] ${text}`);
+            await agent.complete(`[from:${from}] ${text}`);
           }
         }
       }
@@ -49,7 +49,7 @@ export class Room {
   }
 
   getMembers(): RoomMember[] {
-    return Array.from(this.members.entries()).map(([name, sessionId]) => ({ name, sessionId }));
+    return Array.from(this.members.entries()).map(([name, agentId]) => ({ name, agentId }));
   }
 
   private extractMentions(text: string): string[] {

@@ -1,117 +1,348 @@
-// Core data structures for Agent Model Client SDK
+// Core type definitions for KODE SDK v2.7
+
+export type MessageRole = 'user' | 'assistant' | 'system';
 
 export type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'tool_use'; id: string; name: string; input: any }
   | { type: 'tool_result'; tool_use_id: string; content: any; is_error?: boolean };
 
-export type MessageRole = 'user' | 'assistant' | 'system';
-
 export interface Message {
   role: MessageRole;
   content: ContentBlock[];
 }
 
-export type AgentState = 'READY' | 'PAUSED' | 'BUSY';
+export interface Bookmark {
+  seq: number;
+  timestamp: number;
+}
 
-export type ErrorKind =
-  | 'ProviderError'
-  | 'ToolTimeout'
-  | 'ToolDenied'
-  | 'PermissionPending'
-  | 'PolicyViolation'
-  | 'StoreError'
-  | 'MCPError';
+export type AgentChannel = 'progress' | 'control' | 'monitor';
 
-export type AgentEventKind =
-  | 'text_chunk'
-  | 'text'
-  | 'tool_use'
-  | 'tool_result'
-  | 'usage'
-  | 'error'
-  | 'messages_update'
-  | 'permission_ask'
-  | 'permission_decision'
-  | 'commit'
-  | 'state'
-  | 'resume'
-  | 'forked';
+export type AgentRuntimeState = 'READY' | 'WORKING' | 'PAUSED';
 
-export type AgentEvent =
-  | { type: 'text_chunk'; cursor: number; eventId: string; timestamp: number; delta: string }
-  | { type: 'text'; cursor: number; eventId: string; timestamp: number; text: string }
-  | { type: 'tool_use'; cursor: number; eventId: string; timestamp: number; id: string; name: string; input: any }
-  | {
-      type: 'tool_result';
-      cursor: number;
-      eventId: string;
-      timestamp: number;
-      id: string;
-      name: string;
-      ok: boolean;
-      content: any;
-      duration_ms?: number;
-    }
-  | {
-      type: 'usage';
-      cursor: number;
-      eventId: string;
-      timestamp: number;
-      data: {
-        input_tokens: number;
-        output_tokens: number;
-        total_tokens: number;
-        cost_usd?: number;
-        latency_ms?: number;
-      };
-    }
-  | { type: 'error'; cursor: number; eventId: string; timestamp: number; kind: ErrorKind; message: string; hint?: string }
-  | { type: 'messages_update'; cursor: number; eventId: string; timestamp: number; messageCount: number; lastSfpIndex: number; added?: number }
-  | {
-      type: 'permission_ask';
-      cursor: number;
-      eventId: string;
-      timestamp: number;
-      id: string;
-      tool: string;
-      args: any;
-      meta?: any;
-      respond: (decision: 'allow' | 'deny', note?: string) => Promise<void>;
-    }
-  | {
-      type: 'permission_decision';
-      cursor: number;
-      eventId: string;
-      timestamp: number;
-      id: string;
-      decision: 'allow' | 'deny';
-      by: 'api' | 'respond';
-    }
-  | { type: 'commit'; cursor: number; eventId: string; timestamp: number; sfpIndex: number }
-  | { type: 'state'; cursor: number; eventId: string; timestamp: number; state: AgentState }
-  | {
-      type: 'resume';
-      cursor: number;
-      eventId: string;
-      timestamp: number;
-      from: 'crash' | 'manual';
-      sealed: Array<{ tool_use_id: string; note: string }>;
-    }
-  | { type: 'forked'; cursor: number; eventId: string; timestamp: number; childSessionId: string; from: SnapshotId };
+export type BreakpointState =
+  | 'READY'
+  | 'PRE_MODEL'
+  | 'STREAMING_MODEL'
+  | 'TOOL_PENDING'
+  | 'AWAITING_APPROVAL'
+  | 'PRE_TOOL'
+  | 'TOOL_EXECUTING'
+  | 'POST_TOOL';
 
-export const MINIMAL_EVENT_KINDS: AgentEventKind[] = [
-  'text_chunk',
-  'text',
-  'tool_use',
-  'tool_result',
-  'usage',
-  'error',
-  'messages_update',
-];
+export type ToolCallState =
+  | 'PENDING'
+  | 'APPROVAL_REQUIRED'
+  | 'APPROVED'
+  | 'EXECUTING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'DENIED'
+  | 'SEALED';
+
+export interface ToolCallApproval {
+  required: boolean;
+  decision?: 'allow' | 'deny';
+  decidedBy?: string;
+  decidedAt?: number;
+  note?: string;
+  meta?: Record<string, any>;
+}
+
+export interface ToolCallAuditEntry {
+  state: ToolCallState;
+  timestamp: number;
+  note?: string;
+}
+
+export interface ToolCallRecord {
+  id: string;
+  name: string;
+  input: any;
+  state: ToolCallState;
+  approval: ToolCallApproval;
+  result?: any;
+  error?: string;
+  isError?: boolean;
+  startedAt?: number;
+  completedAt?: number;
+  durationMs?: number;
+  createdAt: number;
+  updatedAt: number;
+  auditTrail: ToolCallAuditEntry[];
+}
+
+export type ToolCallSnapshot = Pick<
+  ToolCallRecord,
+  'id' | 'name' | 'state' | 'approval' | 'result' | 'error' | 'isError' | 'durationMs' | 'startedAt' | 'completedAt'
+> & {
+  inputPreview?: any;
+  auditTrail?: ToolCallAuditEntry[];
+};
+
+export interface ProgressThinkChunkStartEvent {
+  channel: 'progress';
+  type: 'think_chunk_start';
+  step: number;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressThinkChunkEvent {
+  channel: 'progress';
+  type: 'think_chunk';
+  step: number;
+  delta: string;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressThinkChunkEndEvent {
+  channel: 'progress';
+  type: 'think_chunk_end';
+  step: number;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressTextChunkStartEvent {
+  channel: 'progress';
+  type: 'text_chunk_start';
+  step: number;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressTextChunkEvent {
+  channel: 'progress';
+  type: 'text_chunk';
+  step: number;
+  delta: string;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressTextChunkEndEvent {
+  channel: 'progress';
+  type: 'text_chunk_end';
+  step: number;
+  text: string;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressToolStartEvent {
+  channel: 'progress';
+  type: 'tool:start';
+  call: ToolCallSnapshot;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressToolEndEvent {
+  channel: 'progress';
+  type: 'tool:end';
+  call: ToolCallSnapshot;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressToolErrorEvent {
+  channel: 'progress';
+  type: 'tool:error';
+  call: ToolCallSnapshot;
+  error: string;
+  bookmark?: Bookmark;
+}
+
+export interface ProgressDoneEvent {
+  channel: 'progress';
+  type: 'done';
+  step: number;
+  reason: 'completed' | 'interrupted';
+  bookmark?: Bookmark;
+}
+
+export type ProgressEvent =
+  | ProgressThinkChunkStartEvent
+  | ProgressThinkChunkEvent
+  | ProgressThinkChunkEndEvent
+  | ProgressTextChunkStartEvent
+  | ProgressTextChunkEvent
+  | ProgressTextChunkEndEvent
+  | ProgressToolStartEvent
+  | ProgressToolEndEvent
+  | ProgressToolErrorEvent
+  | ProgressDoneEvent;
+
+export interface ControlPermissionRequiredEvent {
+  channel: 'control';
+  type: 'permission_required';
+  call: ToolCallSnapshot;
+  respond(decision: 'allow' | 'deny', opts?: { note?: string }): Promise<void>;
+  bookmark?: Bookmark;
+}
+
+export interface ControlPermissionDecidedEvent {
+  channel: 'control';
+  type: 'permission_decided';
+  callId: string;
+  decision: 'allow' | 'deny';
+  decidedBy: string;
+  note?: string;
+  bookmark?: Bookmark;
+}
+
+export type ControlEvent = ControlPermissionRequiredEvent | ControlPermissionDecidedEvent;
+
+export interface MonitorStateChangedEvent {
+  channel: 'monitor';
+  type: 'state_changed';
+  state: AgentRuntimeState;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorStepCompleteEvent {
+  channel: 'monitor';
+  type: 'step_complete';
+  step: number;
+  durationMs?: number;
+  bookmark: Bookmark;
+}
+
+export interface MonitorErrorEvent {
+  channel: 'monitor';
+  type: 'error';
+  severity: 'info' | 'warn' | 'error';
+  phase: 'model' | 'tool' | 'system' | 'lifecycle';
+  message: string;
+  detail?: any;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorTokenUsageEvent {
+  channel: 'monitor';
+  type: 'token_usage';
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorToolExecutedEvent {
+  channel: 'monitor';
+  type: 'tool_executed';
+  call: ToolCallSnapshot;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorAgentResumedEvent {
+  channel: 'monitor';
+  type: 'agent_resumed';
+  strategy: 'crash' | 'manual';
+  sealed: ToolCallSnapshot[];
+  bookmark?: Bookmark;
+}
+
+export interface MonitorBreakpointChangedEvent {
+  channel: 'monitor';
+  type: 'breakpoint_changed';
+  previous: BreakpointState;
+  current: BreakpointState;
+  timestamp: number;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorTodoChangedEvent {
+  channel: 'monitor';
+  type: 'todo_changed';
+  current: import('./todo').TodoItem[];
+  previous: import('./todo').TodoItem[];
+  bookmark?: Bookmark;
+}
+
+export interface MonitorTodoReminderEvent {
+  channel: 'monitor';
+  type: 'todo_reminder';
+  todos: import('./todo').TodoItem[];
+  reason: string;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorFileChangedEvent {
+  channel: 'monitor';
+  type: 'file_changed';
+  path: string;
+  mtime: number;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorReminderSentEvent {
+  channel: 'monitor';
+  type: 'reminder_sent';
+  category: 'file' | 'todo' | 'security' | 'performance' | 'general';
+  content: string;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorContextCompressionEvent {
+  channel: 'monitor';
+  type: 'context_compression';
+  phase: 'start' | 'end';
+  summary?: string;
+  ratio?: number;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorSchedulerTriggeredEvent {
+  channel: 'monitor';
+  type: 'scheduler_triggered';
+  taskId: string;
+  spec: string;
+  kind: 'steps' | 'time' | 'cron';
+  triggeredAt: number;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorToolManualUpdatedEvent {
+  channel: 'monitor';
+  type: 'tool_manual_updated';
+  tools: string[];
+  timestamp: number;
+  bookmark?: Bookmark;
+}
+
+export interface MonitorToolCustomEvent {
+  channel: 'monitor';
+  type: 'tool_custom_event';
+  toolName: string;
+  eventType: string;
+  data?: any;
+  timestamp: number;
+  bookmark?: Bookmark;
+}
+
+export type MonitorEvent =
+  | MonitorStateChangedEvent
+  | MonitorStepCompleteEvent
+  | MonitorErrorEvent
+  | MonitorTokenUsageEvent
+  | MonitorToolExecutedEvent
+  | MonitorAgentResumedEvent
+  | MonitorTodoChangedEvent
+  | MonitorTodoReminderEvent
+  | MonitorFileChangedEvent
+  | MonitorReminderSentEvent
+  | MonitorContextCompressionEvent
+  | MonitorSchedulerTriggeredEvent
+  | MonitorBreakpointChangedEvent
+  | MonitorToolManualUpdatedEvent
+  | MonitorToolCustomEvent;
+
+export type AgentEvent = ProgressEvent | ControlEvent | MonitorEvent;
+
+export interface AgentEventEnvelope<T extends AgentEvent = AgentEvent> {
+  cursor: number;
+  bookmark: Bookmark;
+  event: T;
+}
 
 export interface Timeline {
   cursor: number;
+  bookmark: Bookmark;
   event: AgentEvent;
 }
 
@@ -121,44 +352,55 @@ export interface Snapshot {
   id: SnapshotId;
   messages: Message[];
   lastSfpIndex: number;
+  lastBookmark: Bookmark;
   createdAt: string;
-}
-
-export interface SubscribeOptions {
-  since?: number;
-  kinds?: AgentEventKind[];
+  metadata?: Record<string, any>;
 }
 
 export interface AgentStatus {
-  state: AgentState;
-  sessionId: string;
-  messageCount: number;
+  agentId: string;
+  state: AgentRuntimeState;
+  stepCount: number;
   lastSfpIndex: number;
+  lastBookmark?: Bookmark;
   cursor: number;
+  breakpoint: BreakpointState;
 }
 
 export interface AgentInfo {
-  sessionId: string;
+  agentId: string;
   templateId: string;
   createdAt: string;
   lineage: string[];
+  configVersion: string;
   messageCount: number;
   lastSfpIndex: number;
+  lastBookmark?: Bookmark;
+  breakpoint?: BreakpointState;
+  metadata?: Record<string, any>;
 }
 
-export interface ToolCall {
-  id: string;
-  name: string;
-  args: any;
-  sessionId: string;
+export interface ReminderOptions {
+  skipStandardEnding?: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  category?: 'file' | 'todo' | 'security' | 'performance' | 'general';
 }
+
+export type ResumeStrategy = 'crash' | 'manual';
 
 export interface ToolOutcome {
   id: string;
   name: string;
   ok: boolean;
   content: any;
-  duration_ms?: number;
+  durationMs?: number;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  args: any;
+  agentId: string;
 }
 
 export type HookDecision =
@@ -173,7 +415,10 @@ export type PostHookResult =
   | { replace: ToolOutcome };
 
 export interface ToolContext {
-  sessionId: string;
+  agentId: string;
   sandbox: import('../infra/sandbox').Sandbox;
-  agent: any; // Circular dependency - will be narrowed at usage site
+  agent: any;
+  services?: Record<string, any>;
+  signal?: AbortSignal;
+  emit?: (eventType: string, data?: any) => void;
 }

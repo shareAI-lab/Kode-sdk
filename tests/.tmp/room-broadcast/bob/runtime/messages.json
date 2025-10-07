@@ -1,0 +1,20 @@
+[
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "text",
+        "text": "[from:Alice] Hello everyone"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "response"
+      }
+    ]
+  }
+]

@@ -1,39 +1,37 @@
-import { Agent, AgentOptions } from '../core/agent';
-import { Store } from '../infra/store';
-import { AgentTemplate } from '../tools/task';
-import { AgentStatus, SnapshotId } from '../core/types';
+import { Agent, AgentConfig, AgentDependencies } from './agent';
+import { AgentStatus, SnapshotId } from './types';
 
 export interface AgentPoolOptions {
-  store: Store;
+  dependencies: AgentDependencies;
   maxAgents?: number;
 }
 
 export class AgentPool {
   private agents = new Map<string, Agent>();
-  private store: Store;
+  private deps: AgentDependencies;
   private maxAgents: number;
 
   constructor(opts: AgentPoolOptions) {
-    this.store = opts.store;
+    this.deps = opts.dependencies;
     this.maxAgents = opts.maxAgents || 50;
   }
 
-  create(sessionId: string, templateOrOpts: AgentTemplate | AgentOptions, overrides?: Partial<AgentOptions>): Agent {
-    if (this.agents.has(sessionId)) {
-      throw new Error(`Agent already exists: ${sessionId}`);
+  async create(agentId: string, config: AgentConfig): Promise<Agent> {
+    if (this.agents.has(agentId)) {
+      throw new Error(`Agent already exists: ${agentId}`);
     }
 
     if (this.agents.size >= this.maxAgents) {
       throw new Error(`Pool is full (max ${this.maxAgents} agents)`);
     }
 
-    const agent = new Agent(templateOrOpts, overrides);
-    this.agents.set(sessionId, agent);
+    const agent = await Agent.create({ ...config, agentId }, this.deps);
+    this.agents.set(agentId, agent);
     return agent;
   }
 
-  get(sessionId: string): Agent | undefined {
-    return this.agents.get(sessionId);
+  get(agentId: string): Agent | undefined {
+    return this.agents.get(agentId);
   }
 
   list(opts?: { prefix?: string }): string[] {
@@ -41,27 +39,24 @@ export class AgentPool {
     return opts?.prefix ? ids.filter((id) => id.startsWith(opts.prefix!)) : ids;
   }
 
-  async status(sessionId: string): Promise<AgentStatus | undefined> {
-    const agent = this.agents.get(sessionId);
+  async status(agentId: string): Promise<AgentStatus | undefined> {
+    const agent = this.agents.get(agentId);
     return agent ? await agent.status() : undefined;
   }
 
-  async fork(sessionId: string, snapshotSel?: SnapshotId | { at?: string }): Promise<Agent> {
-    const agent = this.agents.get(sessionId);
+  async fork(agentId: string, snapshotSel?: SnapshotId | { at?: string }): Promise<Agent> {
+    const agent = this.agents.get(agentId);
     if (!agent) {
-      throw new Error(`Agent not found: ${sessionId}`);
+      throw new Error(`Agent not found: ${agentId}`);
     }
 
     return agent.fork(snapshotSel);
   }
 
-  async resume(
-    sessionId: string,
-    opts: Omit<AgentOptions, 'sessionId' | 'store'> & { autoRun?: boolean; strategy?: 'crash' | 'manual' }
-  ): Promise<Agent> {
+  async resume(agentId: string, config: AgentConfig, opts?: { autoRun?: boolean; strategy?: 'crash' | 'manual' }): Promise<Agent> {
     // 1. Check if already in pool
-    if (this.agents.has(sessionId)) {
-      return this.agents.get(sessionId)!;
+    if (this.agents.has(agentId)) {
+      return this.agents.get(agentId)!;
     }
 
     // 2. Check pool capacity
@@ -70,50 +65,46 @@ export class AgentPool {
     }
 
     // 3. Verify session exists
-    const exists = await this.store.exists(sessionId);
+    const exists = await this.deps.store.exists(agentId);
     if (!exists) {
-      throw new Error(`Session not found in store: ${sessionId}`);
+      throw new Error(`Agent not found in store: ${agentId}`);
     }
 
     // 4. Use Agent.resume() to restore
-    const agent = await Agent.resume(sessionId, {
-      ...opts,
-      sessionId,
-      store: this.store,
-    });
+    const agent = await Agent.resume(agentId, { ...config, agentId }, this.deps, opts);
 
     // 5. Add to pool
-    this.agents.set(sessionId, agent);
+    this.agents.set(agentId, agent);
 
     return agent;
   }
 
   async resumeAll(
-    configFactory: (sessionId: string) => Omit<AgentOptions, 'sessionId' | 'store'>,
+    configFactory: (agentId: string) => AgentConfig,
     opts?: { autoRun?: boolean; strategy?: 'crash' | 'manual' }
   ): Promise<Agent[]> {
-    const sessionIds = await this.store.list();
+    const agentIds = await this.deps.store.list();
     const resumed: Agent[] = [];
 
-    for (const sessionId of sessionIds) {
+    for (const agentId of agentIds) {
       if (this.agents.size >= this.maxAgents) break;
-      if (this.agents.has(sessionId)) continue;
+      if (this.agents.has(agentId)) continue;
 
       try {
-        const config = configFactory(sessionId);
-        const agent = await this.resume(sessionId, { ...config, ...opts });
+        const config = configFactory(agentId);
+        const agent = await this.resume(agentId, config, opts);
         resumed.push(agent);
       } catch (error) {
-        console.error(`Failed to resume ${sessionId}:`, error);
+        console.error(`Failed to resume ${agentId}:`, error);
       }
     }
 
     return resumed;
   }
 
-  async delete(sessionId: string): Promise<void> {
-    this.agents.delete(sessionId);
-    await this.store.delete(sessionId);
+  async delete(agentId: string): Promise<void> {
+    this.agents.delete(agentId);
+    await this.deps.store.delete(agentId);
   }
 
   size(): number {

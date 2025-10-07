@@ -1,7 +1,7 @@
 {
-  "name": "kode-agent",
-  "version": "1.5.2-beta.1",
-  "description": "Event-driven Agent Model Client SDK for building long-running, collaborative AI agents",
+  "name": "@shareai-lab/kode-sdk",
+  "version": "2.7.0",
+  "description": "Event-driven, long-running AI Agent development framework with enterprise-grade persistence and context management",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -9,14 +9,17 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "prepare": "npm run build",
-    "test:cli": "ts-node test-cli.ts",
-    "example:u1": "ts-node examples/u1-nextjs-backend.ts",
-    "example:u2": "ts-node examples/u2-permission-approval.ts",
-    "example:u3": "ts-node examples/u3-hook-guard.ts",
-    "example:u4": "ts-node examples/u4-scheduler.ts",
-    "example:u5": "ts-node examples/u5-sub-agent.ts",
-    "example:u6": "ts-node examples/u6-room-chat.ts",
-    "example:u7": "ts-node examples/u7-chatdev-team.ts"
+    "test": "npm run test:unit",
+    "test:unit": "ts-node --project tsconfig.json ./tests/run-unit.ts",
+    "test:integration": "ts-node --project tsconfig.json ./tests/run-integration.ts",
+    "test:e2e": "ts-node --project tsconfig.json ./tests/run-e2e.ts",
+    "test:all": "ts-node --project tsconfig.json ./tests/run-all.ts",
+    "example:getting-started": "ts-node examples/getting-started.ts",
+    "example:agent-inbox": "ts-node examples/01-agent-inbox.ts",
+    "example:approval": "ts-node examples/02-approval-control.ts",
+    "example:room": "ts-node examples/03-room-collab.ts",
+    "example:scheduler": "ts-node examples/04-scheduler-watch.ts",
+    "example:nextjs": "ts-node examples/nextjs-api-route.ts"
   },
   "keywords": [
     "agent",
@@ -31,16 +34,24 @@
   ],
   "author": "",
   "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.19.1",
+    "ajv": "^8.17.1",
+    "dotenv": "^16.4.5",
+    "fast-glob": "^3.3.2",
+    "zod-to-json-schema": "^3.24.6"
+  },
   "devDependencies": {
+    "@shareai-lab/kode-sdk": "^1.0.0-beta.9",
     "@types/node": "^20.0.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.3.0"
   },
-  "dependencies": {
-    "kode-agent": "^1.5.2-beta.1"
-  },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",
